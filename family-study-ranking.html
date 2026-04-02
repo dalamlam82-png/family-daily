@@ -1,0 +1,625 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>가족 스터디 랭킹 & 루틴 달력</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7/babel.min.js"></script>
+  <!-- ★ Supabase CDN ★ -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+    tailwind.config={theme:{extend:{colors:{
+      unni:{50:'#fdf2f8',100:'#fce7f3',200:'#fbcfe8',300:'#f9a8d4',400:'#f472b6',500:'#ec4899',600:'#db2777',700:'#be185d'},
+      me:{50:'#f0fdfa',100:'#ccfbf1',200:'#99f6e4',300:'#5eead4',400:'#2dd4bf',500:'#14b8a6',600:'#0d9488',700:'#0f766e'},
+      bro:{50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',300:'#93c5fd',400:'#60a5fa',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8'},
+    }}}}
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+    body{font-family:'Inter',sans-serif}
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+    input[type="number"]{-moz-appearance:textfield}
+    @keyframes pop{0%{transform:scale(0)}60%{transform:scale(1.2)}100%{transform:scale(1)}}
+    @keyframes slideUp{0%{opacity:0;transform:translateY(12px)}100%{opacity:1;transform:translateY(0)}}
+    @keyframes fadeIn{0%{opacity:0}100%{opacity:1}}
+    @keyframes modalIn{0%{opacity:0;transform:translateY(30px) scale(.95)}100%{opacity:1;transform:translateY(0) scale(1)}}
+    @keyframes confetti{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(80px) rotate(600deg);opacity:0}}
+    @keyframes firework-burst{0%{transform:translate(0,0) scale(0);opacity:1}50%{opacity:1}100%{transform:translate(var(--fx),var(--fy)) scale(1);opacity:0}}
+    @keyframes sparkle{0%,100%{opacity:0;transform:scale(0) rotate(0)}50%{opacity:1;transform:scale(1) rotate(180deg)}}
+    @keyframes trophy-bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+    @keyframes crown-glow{0%,100%{filter:drop-shadow(0 0 4px rgba(250,204,21,0.4))}50%{filter:drop-shadow(0 0 16px rgba(250,204,21,0.9))}}
+    @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.4}}
+    .anim-pop{animation:pop .4s cubic-bezier(.68,-.55,.27,1.55) forwards}
+    .anim-slide{animation:slideUp .3s ease forwards}
+    .anim-fade{animation:fadeIn .2s ease forwards}
+    .anim-modal{animation:modalIn .35s cubic-bezier(.16,1,.3,1) forwards}
+    .confetti-p{animation:confetti 1.2s ease-out forwards}
+    .firework-particle{animation:firework-burst 1s ease-out forwards}
+    .sparkle-star{animation:sparkle 1.5s ease-in-out infinite}
+    .trophy-bounce{animation:trophy-bounce 1.5s ease-in-out infinite}
+    .crown-glow{animation:crown-glow 2s ease-in-out infinite}
+    .pulse-dot{animation:pulse-dot 2s ease-in-out infinite}
+    .scroll-thin::-webkit-scrollbar{width:3px}
+    .scroll-thin::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}
+    .cal-cell{min-height:72px;cursor:pointer;transition:background .15s}
+    .cal-cell:hover{background:rgba(59,130,246,0.04)}
+    @media(max-width:640px){.cal-cell{min-height:58px}}
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+<div id="root"></div>
+
+<!--
+╔══════════════════════════════════════════════════════════════╗
+║  ★ SUPABASE 설정 가이드 ★                                    ║
+║                                                              ║
+║  1. https://supabase.com 에서 무료 프로젝트 생성              ║
+║                                                              ║
+║  2. SQL Editor에서 아래 SQL 실행:                              ║
+║                                                              ║
+║  CREATE TABLE member_daily (                                 ║
+║    id BIGSERIAL PRIMARY KEY,                                 ║
+║    date TEXT NOT NULL,                                       ║
+║    member_id TEXT NOT NULL,                                  ║
+║    wake_time TEXT DEFAULT '',                                ║
+║    cafe BOOLEAN DEFAULT FALSE,                               ║
+║    swim BOOLEAN DEFAULT FALSE,                               ║
+║    sessions JSONB DEFAULT '[]',                              ║
+║    updated_at TIMESTAMPTZ DEFAULT NOW(),                     ║
+║    UNIQUE(date, member_id)                                   ║
+║  );                                                          ║
+║                                                              ║
+║  CREATE TABLE food_expenses (                                ║
+║    id BIGSERIAL PRIMARY KEY,                                 ║
+║    date TEXT NOT NULL,                                       ║
+║    name TEXT NOT NULL,                                       ║
+║    amount INTEGER NOT NULL DEFAULT 0,                        ║
+║    created_at TIMESTAMPTZ DEFAULT NOW()                      ║
+║  );                                                          ║
+║                                                              ║
+║  ALTER TABLE member_daily ENABLE ROW LEVEL SECURITY;         ║
+║  ALTER TABLE food_expenses ENABLE ROW LEVEL SECURITY;        ║
+║                                                              ║
+║  CREATE POLICY "Allow all" ON member_daily                   ║
+║    FOR ALL USING (true) WITH CHECK (true);                   ║
+║  CREATE POLICY "Allow all" ON food_expenses                  ║
+║    FOR ALL USING (true) WITH CHECK (true);                   ║
+║                                                              ║
+║  -- Realtime 활성화 (Supabase 대시보드에서도 가능)              ║
+║  ALTER PUBLICATION supabase_realtime                          ║
+║    ADD TABLE member_daily, food_expenses;                    ║
+║                                                              ║
+║  3. 아래 SUPABASE_URL과 SUPABASE_ANON_KEY를                  ║
+║     본인 프로젝트 값으로 교체                                  ║
+║                                                              ║
+╚══════════════════════════════════════════════════════════════╝
+-->
+
+<script type="text/babel">
+const{useState,useEffect,useCallback,useMemo,useRef}=React;
+
+/* ╔══════════════════════════════════════════╗
+   ║  ★ 여기에 본인의 Supabase 정보 입력 ★    ║
+   ╚══════════════════════════════════════════╝ */
+const SUPABASE_URL  = 'https://YOUR_PROJECT_ID.supabase.co';
+const SUPABASE_ANON = 'YOUR_ANON_KEY_HERE';
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+const isConfigured = !SUPABASE_URL.includes('YOUR_PROJECT_ID');
+
+/* ── Constants ── */
+const MEMBERS=[
+  {id:'first',name:'첫째',emoji:'👩',color:'#ec4899',bg:'#fdf2f8',ring:'#fce7f3'},
+  {id:'second',name:'둘째',emoji:'👧',color:'#14b8a6',bg:'#f0fdfa',ring:'#ccfbf1'},
+  {id:'third',name:'막내',emoji:'👦',color:'#3b82f6',bg:'#eff6ff',ring:'#dbeafe'},
+];
+const DAYS=['일','월','화','수','목','금','토'];
+const TODAY=()=>new Date().toISOString().slice(0,10);
+const getLS=(k,fb)=>{try{return JSON.parse(localStorage.getItem(k))||fb}catch{return fb}};
+const setLS=(k,v)=>localStorage.setItem(k,JSON.stringify(v));
+const toMin=t=>{if(!t)return null;const[h,m]=t.split(':').map(Number);return h*60+m};
+
+const sessHrs=s=>((s.hours||0)+(s.mins||0)/60);
+const totalSessHrs=arr=>(arr||[]).reduce((sum,s)=>sum+sessHrs(s),0);
+const fmtHM=dec=>{
+  if(!dec||dec<=0) return '0h';
+  const h=Math.floor(dec),m=Math.round((dec-h)*60);
+  if(h>0&&m>0) return `${h}h ${m}m`;
+  if(h>0) return `${h}h`;
+  return `${m}m`;
+};
+const fmtShort=dec=>{
+  if(!dec||dec<=0) return '0';
+  const h=Math.floor(dec),m=Math.round((dec-h)*60);
+  if(h>0&&m>0) return `${h}h${m}m`;
+  if(h>0) return `${h}h`;
+  return `${m}m`;
+};
+const getMonthDays=(y,m)=>{
+  const first=new Date(y,m,1),last=new Date(y,m+1,0),startDay=first.getDay(),days=[];
+  for(let i=0;i<startDay;i++) days.push(null);
+  for(let d=1;d<=last.getDate();d++) days.push(d);
+  return days;
+};
+const getWeekDates=base=>{
+  const d=new Date(base),day=d.getDay(),mon=new Date(d);
+  mon.setDate(d.getDate()-((day+6)%7));
+  return Array.from({length:7},(_,i)=>{const dd=new Date(mon);dd.setDate(mon.getDate()+i);return dd.toISOString().slice(0,10);});
+};
+const fmtDate=(y,m,d)=>`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+
+/* ── Confetti ── */
+function Confetti({active,baseColor}){
+  if(!active)return null;
+  const shades=[baseColor,'#fbbf24','#f472b6','#60a5fa','#34d399'];
+  const ps=Array.from({length:18},(_,i)=>({id:i,left:Math.random()*100,delay:Math.random()*0.5,size:4+Math.random()*5,color:shades[i%shades.length],br:Math.random()>0.5?'50%':'2px'}));
+  return(<div className="absolute inset-0 overflow-hidden pointer-events-none z-30">{ps.map(p=><div key={p.id} className="absolute confetti-p" style={{left:`${p.left}%`,top:0,width:p.size,height:p.size*1.3,borderRadius:p.br,backgroundColor:p.color,animationDelay:`${p.delay}s`}}/>)}</div>);
+}
+function Fireworks({active,color}){
+  const[particles,setParticles]=useState([]);
+  useEffect(()=>{
+    if(!active){setParticles([]);return;}
+    const colors=[color,'#fbbf24','#f472b6','#60a5fa','#a855f7','#34d399','#f97316'];
+    const bursts=[];
+    for(let b=0;b<5;b++){const cx=15+Math.random()*70,cy=15+Math.random()*40;for(let i=0;i<14;i++){const angle=(Math.PI*2/14)*i,dist=40+Math.random()*40;bursts.push({id:`${b}-${i}`,cx,cy,fx:Math.cos(angle)*dist,fy:Math.sin(angle)*dist,size:3+Math.random()*4,color:colors[Math.floor(Math.random()*colors.length)],delay:b*0.25,br:Math.random()>0.5?'50%':'2px'});}}
+    setParticles(bursts);const t=setTimeout(()=>setParticles([]),2500);return()=>clearTimeout(t);
+  },[active,color]);
+  if(!particles.length)return null;
+  return(<div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">{particles.map(p=>(<div key={p.id} className="absolute firework-particle" style={{left:`${p.cx}%`,top:`${p.cy}%`,width:p.size,height:p.size,borderRadius:p.br,backgroundColor:p.color,'--fx':`${p.fx}px`,'--fy':`${p.fy}px`,animationDelay:`${p.delay}s`}}/>))}{Array.from({length:8},(_,i)=>(<div key={`s${i}`} className="absolute sparkle-star text-2xl" style={{left:`${10+Math.random()*80}%`,top:`${5+Math.random()*50}%`,animationDelay:`${i*0.2}s`}}>{['✨','🎆','🎇','⭐','🌟','💫','🎉','🎊'][i]}</div>))}</div>);
+}
+
+/* ── Icons ── */
+const Ic=({children,size=20,color="currentColor",className="",...rest})=>(<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} {...rest}>{children}</svg>);
+const PlusIc=p=><Ic {...p}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></Ic>;
+const MinusIc=p=><Ic {...p}><line x1="5" y1="12" x2="19" y2="12"/></Ic>;
+const XIcon=p=><Ic {...p}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></Ic>;
+const ChevL=p=><Ic {...p}><polyline points="15 18 9 12 15 6"/></Ic>;
+const ChevR=p=><Ic {...p}><polyline points="9 6 15 12 9 18"/></Ic>;
+
+/* ── Day Detail Modal ── */
+function DayModal({dateStr,allData,onClose}){
+  if(!dateStr) return null;
+  const dayData=allData[dateStr]||{};
+  const dow=DAYS[new Date(dateStr).getDay()];
+  const hasAnyData=MEMBERS.some(m=>dayData[m.id]);
+  return(
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/40 anim-fade"/>
+      <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden anim-modal" onClick={e=>e.stopPropagation()}>
+        <div className="sticky top-0 bg-white border-b border-slate-100 px-5 py-4 flex items-center justify-between z-10">
+          <div><h2 className="text-lg font-extrabold text-slate-800">📋 {dateStr}</h2><p className="text-xs text-slate-400">{dow}요일 상세 기록</p></div>
+          <button onClick={onClose} className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center hover:bg-slate-200 active:scale-95"><XIcon size={16} color="#64748b"/></button>
+        </div>
+        <div className="p-5 space-y-4 overflow-y-auto max-h-[60vh] scroll-thin">
+          {!hasAnyData&&<div className="text-center py-10"><span className="text-4xl block mb-3">📭</span><p className="text-slate-400 text-sm">이 날은 아직 기록이 없어요</p></div>}
+          {MEMBERS.map(m=>{
+            const md=dayData[m.id];
+            if(!md) return(<div key={m.id} className="rounded-xl border border-slate-100 p-4 opacity-50"><div className="flex items-center gap-2 mb-1"><span className="w-8 h-8 rounded-full flex items-center justify-center text-base border-2" style={{borderColor:m.color,backgroundColor:m.bg}}>{m.emoji}</span><span className="text-sm font-semibold text-slate-500">{m.name}</span></div><p className="text-xs text-slate-300 ml-10">기록 없음</p></div>);
+            const totalH=totalSessHrs(md.sessions);
+            return(
+              <div key={m.id} className="rounded-2xl border-2 p-4 anim-slide" style={{borderColor:m.color+'30',backgroundColor:m.bg+'80'}}>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-9 h-9 rounded-full flex items-center justify-center text-lg border-2 shadow-sm" style={{borderColor:m.color,backgroundColor:'white'}}>{m.emoji}</span>
+                    <div><p className="text-sm font-bold" style={{color:m.color}}>{m.name}</p>{md.wakeTime&&<p className="text-[10px] text-slate-400">⏰ 기상 {md.wakeTime}</p>}</div>
+                  </div>
+                  <div className="flex items-center gap-1.5">{md.cafe&&<span className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center text-sm">☕</span>}{md.swim&&<span className="w-7 h-7 rounded-lg bg-cyan-100 flex items-center justify-center text-sm">🏊</span>}</div>
+                </div>
+                {(md.sessions&&md.sessions.length>0)?(<div className="space-y-1.5"><p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">공부 세션</p>{md.sessions.map((sess,i)=>(<div key={i} className="flex items-center justify-between bg-white/80 rounded-lg px-3 py-2"><div className="flex items-center gap-2"><span className="w-1.5 h-5 rounded-full" style={{backgroundColor:m.color}}/><span className="text-sm text-slate-700 font-medium">{sess.name||'(무제)'}</span></div><span className="text-sm font-bold" style={{color:m.color}}>{(sess.hours||0)>0&&`${sess.hours}h `}{(sess.mins||0)>0&&`${sess.mins}m`}{!(sess.hours||0)&&!(sess.mins||0)&&'0h'}</span></div>))}<div className="flex justify-end pt-1 border-t border-slate-200/50"><span className="text-xs font-extrabold" style={{color:m.color}}>합계 {fmtHM(totalH)}</span></div></div>):(<p className="text-xs text-slate-400 ml-1">공부 기록 없음</p>)}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ╔══════════════════════════════════════════╗
+   ║        ★ SUPABASE DATA LAYER ★          ║
+   ╚══════════════════════════════════════════╝ */
+
+// DB → allData 형태로 변환: { [date]: { [member_id]: {wakeTime, cafe, swim, sessions} } }
+function rowsToAllData(rows){
+  const out={};
+  rows.forEach(r=>{
+    if(!out[r.date]) out[r.date]={};
+    out[r.date][r.member_id]={
+      wakeTime:r.wake_time||'',
+      cafe:!!r.cafe,
+      swim:!!r.swim,
+      sessions:r.sessions||[],
+    };
+  });
+  return out;
+}
+
+function useSupabaseStudy(){
+  const[allData,setAllData]=useState(()=>getLS('fam-study-data',{}));
+  const[synced,setSynced]=useState(false);
+
+  // Initial fetch
+  useEffect(()=>{
+    if(!isConfigured) return;
+    (async()=>{
+      const{data,error}=await supabase.from('member_daily').select('*');
+      if(!error&&data){
+        const fresh=rowsToAllData(data);
+        setAllData(fresh);
+        setLS('fam-study-data',fresh);
+        setSynced(true);
+      }
+    })();
+  },[]);
+
+  // Realtime subscription
+  useEffect(()=>{
+    if(!isConfigured) return;
+    const channel=supabase.channel('study-realtime')
+      .on('postgres_changes',{event:'*',schema:'public',table:'member_daily'},payload=>{
+        // Re-fetch all on any change (simple & reliable)
+        (async()=>{
+          const{data}=await supabase.from('member_daily').select('*');
+          if(data){
+            const fresh=rowsToAllData(data);
+            setAllData(fresh);
+            setLS('fam-study-data',fresh);
+          }
+        })();
+      })
+      .subscribe();
+    return()=>{supabase.removeChannel(channel);};
+  },[]);
+
+  const saveMember=useCallback(async(mid,date,updates)=>{
+    // Optimistic local update
+    setAllData(prev=>{
+      const dayData=prev[date]||{};
+      const cur=dayData[mid]||{wakeTime:'',cafe:false,swim:false,sessions:[]};
+      const merged={...cur,...updates};
+      if(updates.sessions===undefined) merged.sessions=cur.sessions||[];
+      const next={...prev,[date]:{...dayData,[mid]:merged}};
+      setLS('fam-study-data',next);
+
+      // Async push to Supabase
+      if(isConfigured){
+        supabase.from('member_daily').upsert({
+          date,
+          member_id:mid,
+          wake_time:merged.wakeTime,
+          cafe:merged.cafe,
+          swim:merged.swim,
+          sessions:merged.sessions,
+          updated_at:new Date().toISOString(),
+        },{onConflict:'date,member_id'}).then(({error})=>{
+          if(error) console.error('Supabase save error:',error);
+        });
+      }
+      return next;
+    });
+  },[]);
+
+  const memberData=useCallback((mid,date)=>{
+    return allData[date]?.[mid]||{wakeTime:'',cafe:false,swim:false,sessions:[]};
+  },[allData]);
+
+  return{allData,saveMember,memberData,synced};
+}
+
+function useSupabaseFood(){
+  const today=TODAY();
+  const[foodData,setFoodData]=useState(()=>getLS('fam-food-data',[]));
+  const[synced,setSynced]=useState(false);
+
+  // Initial fetch
+  useEffect(()=>{
+    if(!isConfigured) return;
+    (async()=>{
+      const{data,error}=await supabase.from('food_expenses').select('*').order('created_at',{ascending:false});
+      if(!error&&data){
+        const list=data.map(r=>({id:r.id,date:r.date,name:r.name,amount:r.amount}));
+        setFoodData(list);
+        setLS('fam-food-data',list);
+        setSynced(true);
+      }
+    })();
+  },[]);
+
+  // Realtime
+  useEffect(()=>{
+    if(!isConfigured) return;
+    const channel=supabase.channel('food-realtime')
+      .on('postgres_changes',{event:'*',schema:'public',table:'food_expenses'},()=>{
+        (async()=>{
+          const{data}=await supabase.from('food_expenses').select('*').order('created_at',{ascending:false});
+          if(data){
+            const list=data.map(r=>({id:r.id,date:r.date,name:r.name,amount:r.amount}));
+            setFoodData(list);
+            setLS('fam-food-data',list);
+          }
+        })();
+      })
+      .subscribe();
+    return()=>{supabase.removeChannel(channel);};
+  },[]);
+
+  const addFood=useCallback(async(entry)=>{
+    // Optimistic
+    const tempId=Date.now();
+    const item={id:tempId,...entry};
+    setFoodData(prev=>{const next=[item,...prev];setLS('fam-food-data',next);return next;});
+
+    if(isConfigured){
+      const{data,error}=await supabase.from('food_expenses').insert({date:entry.date,name:entry.name,amount:entry.amount}).select().single();
+      if(!error&&data){
+        // Replace temp id with real id
+        setFoodData(prev=>{const next=prev.map(f=>f.id===tempId?{...f,id:data.id}:f);setLS('fam-food-data',next);return next;});
+      }
+    }
+  },[]);
+
+  const deleteFood=useCallback(async(id)=>{
+    setFoodData(prev=>{const next=prev.filter(f=>f.id!==id);setLS('fam-food-data',next);return next;});
+    if(isConfigured){
+      await supabase.from('food_expenses').delete().eq('id',id);
+    }
+  },[]);
+
+  return{foodData,addFood,deleteFood,synced};
+}
+
+/* ══════════════════════════════════════ */
+/*              MAIN APP                  */
+/* ══════════════════════════════════════ */
+function App(){
+  const today=TODAY();
+  const{allData,saveMember,memberData,synced:studySynced}=useSupabaseStudy();
+  const{foodData,addFood,deleteFood,synced:foodSynced}=useSupabaseFood();
+
+  const[tab,setTab]=useState('calendar');
+  const[selectedMember,setSelectedMember]=useState('second');
+  const[calYear,setCalYear]=useState(()=>new Date().getFullYear());
+  const[calMonth,setCalMonth]=useState(()=>new Date().getMonth());
+  const[confetti,setConfetti]=useState(null);
+  const[selectedDate,setSelectedDate]=useState(null);
+  const[showFireworks,setShowFireworks]=useState(false);
+  const prevTabRef=useRef(tab);
+
+  // Food tab state
+  const[foodYear,setFoodYear]=useState(()=>new Date().getFullYear());
+  const[foodMonth,setFoodMonth]=useState(()=>new Date().getMonth());
+  const[newFood,setNewFood]=useState({date:today,name:'',amount:''});
+
+  const handleAddFood=()=>{
+    if(!newFood.name||!newFood.amount) return;
+    addFood({date:newFood.date,name:newFood.name,amount:parseInt(newFood.amount)||0});
+    setNewFood({date:today,name:'',amount:''});
+  };
+
+  const foodMonthKey=`${foodYear}-${String(foodMonth+1).padStart(2,'0')}`;
+  const foodMonthItems=foodData.filter(f=>f.date.startsWith(foodMonthKey)).sort((a,b)=>b.date.localeCompare(a.date)||b.id-a.id);
+  const foodMonthTotal=foodMonthItems.reduce((s,f)=>s+(f.amount||0),0);
+  const fmtWon=n=>n.toLocaleString('ko-KR');
+
+  const weekDates=useMemo(()=>getWeekDates(today),[today]);
+  const weekStudy=useMemo(()=>{
+    return MEMBERS.map(m=>{
+      let total=0;
+      weekDates.forEach(d=>{const md=allData[d]?.[m.id];if(md?.sessions) total+=totalSessHrs(md.sessions);});
+      return{...m,total:Math.round(total*100)/100};
+    }).sort((a,b)=>b.total-a.total);
+  },[allData,weekDates]);
+  const maxStudy=Math.max(...weekStudy.map(w=>w.total),0.01);
+  const calDays=useMemo(()=>getMonthDays(calYear,calMonth),[calYear,calMonth]);
+
+  const fireConfetti=(member,type)=>{setConfetti({member,type});setTimeout(()=>setConfetti(null),1500);};
+
+  useEffect(()=>{
+    if(tab==='ranking'&&prevTabRef.current!=='ranking'&&weekStudy[0]?.total>0){setShowFireworks(true);setTimeout(()=>setShowFireworks(false),2500);}
+    prevTabRef.current=tab;
+  },[tab,weekStudy]);
+
+  const mem=MEMBERS.find(m=>m.id===selectedMember);
+  const isSynced=isConfigured&&studySynced&&foodSynced;
+
+  return(
+    <div className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100">
+      <Fireworks active={showFireworks} color={weekStudy[0]?.color||'#fbbf24'}/>
+
+      {/* Header */}
+      <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-40">
+        <div className="max-w-5xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl">👨‍👩‍👦</span>
+              <div>
+                <h1 className="text-base font-extrabold text-slate-800 tracking-tight">Family Study Tracker</h1>
+                <p className="text-[10px] text-slate-400 font-medium">{today}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {/* ★ 연결 상태 표시 ★ */}
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold ${
+                isConfigured
+                  ? isSynced ? 'bg-green-50 text-green-600' : 'bg-yellow-50 text-yellow-600'
+                  : 'bg-slate-100 text-slate-400'
+              }`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${
+                  isConfigured ? isSynced ? 'bg-green-500 pulse-dot' : 'bg-yellow-500 pulse-dot' : 'bg-slate-300'
+                }`}/>
+                {isConfigured ? isSynced ? '실시간 연결' : '동기화 중...' : '오프라인'}
+              </div>
+              {MEMBERS.map(m=>(
+                <div key={m.id} className="w-7 h-7 rounded-full flex items-center justify-center text-sm border-2"
+                  style={{borderColor:m.color,backgroundColor:m.bg}}>{m.emoji}</div>
+              ))}
+            </div>
+          </div>
+          <nav className="flex gap-1 mt-2 -mb-px">
+            {[['calendar','📅 달력'],['input','✏️ 입력'],['ranking','🏆 랭킹'],['food','🍽️ 식비']].map(([k,label])=>(
+              <button key={k} onClick={()=>setTab(k)}
+                className={`px-4 py-2 text-xs font-semibold rounded-t-lg border-b-2 transition-all ${
+                  tab===k?'border-slate-800 text-slate-800 bg-slate-50':'border-transparent text-slate-400 hover:text-slate-600'}`}>
+                {label}
+              </button>
+            ))}
+          </nav>
+        </div>
+      </header>
+
+      <main className="max-w-5xl mx-auto px-4 py-5">
+
+        {/* ════════ CALENDAR ════════ */}
+        {tab==='calendar'&&(
+          <div className="anim-slide">
+            <div className="flex items-center justify-between mb-4">
+              <button onClick={()=>{let nm=calMonth-1,ny=calYear;if(nm<0){nm=11;ny--;}setCalMonth(nm);setCalYear(ny);}} className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 active:scale-95"><ChevL size={16} color="#475569"/></button>
+              <div className="text-center"><span className="text-lg font-bold text-slate-800">{calYear}년 {calMonth+1}월</span><button onClick={()=>{setCalYear(new Date().getFullYear());setCalMonth(new Date().getMonth())}} className="block mx-auto text-[10px] text-blue-500 hover:underline mt-0.5">이번 달</button></div>
+              <button onClick={()=>{let nm=calMonth+1,ny=calYear;if(nm>11){nm=0;ny++;}setCalMonth(nm);setCalYear(ny);}} className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 active:scale-95"><ChevR size={16} color="#475569"/></button>
+            </div>
+            <div className="flex flex-wrap gap-3 mb-3 px-1">
+              {MEMBERS.map(m=>(<span key={m.id} className="flex items-center gap-1 text-xs text-slate-500"><span className="w-2.5 h-2.5 rounded-full inline-block" style={{backgroundColor:m.color}}/> {m.name}</span>))}
+              <span className="text-xs text-slate-400 ml-auto">날짜를 눌러 상세 보기</span>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="grid grid-cols-7 border-b border-slate-100">{DAYS.map((d,i)=>(<div key={d} className={`py-2 text-center text-xs font-semibold ${i===0?'text-red-400':i===6?'text-blue-400':'text-slate-400'}`}>{d}</div>))}</div>
+              <div className="grid grid-cols-7">
+                {calDays.map((day,i)=>{
+                  if(day===null) return <div key={`e${i}`} className="cal-cell border-b border-r border-slate-50 cursor-default"/>;
+                  const dateStr=fmtDate(calYear,calMonth,day),isToday=dateStr===today,dayOfWeek=new Date(calYear,calMonth,day).getDay();
+                  return(
+                    <div key={i} onClick={()=>setSelectedDate(dateStr)} className={`cal-cell border-b border-r border-slate-50 p-1 relative transition-colors hover:bg-blue-50/40 ${isToday?'bg-blue-50/60':''}`}>
+                      <span className={`text-[11px] font-semibold block leading-tight ${isToday?'text-white bg-blue-500 w-5 h-5 rounded-full flex items-center justify-center':dayOfWeek===0?'text-red-400':dayOfWeek===6?'text-blue-400':'text-slate-500'}`}>{day}</span>
+                      <div className="mt-0.5 space-y-px">{MEMBERS.map(m=>{const md=allData[dateStr]?.[m.id];if(!md||(!md.cafe&&!md.swim))return null;return(<div key={m.id} className="flex items-center gap-px"><span className="w-1.5 h-1.5 rounded-full shrink-0" style={{backgroundColor:m.color}}/><span className="text-[10px] leading-none">{md.cafe&&'☕'}{md.swim&&'🏊'}</span></div>);})}</div>
+                      {(()=>{const hasStudy=MEMBERS.some(m=>totalSessHrs(allData[dateStr]?.[m.id]?.sessions)>0);if(!hasStudy)return null;return(<div className="flex gap-0.5 mt-0.5 flex-wrap">{MEMBERS.map(m=>{const hrs=totalSessHrs(allData[dateStr]?.[m.id]?.sessions);if(hrs<=0)return null;return <span key={m.id} className="text-[8px] font-bold px-0.5 rounded" style={{color:m.color,backgroundColor:m.bg}}>{fmtShort(hrs)}</span>;})}</div>);})()}
+                    </div>);
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ════════ INPUT ════════ */}
+        {tab==='input'&&(
+          <div className="anim-slide space-y-4">
+            <div className="flex gap-2">
+              {MEMBERS.map(m=>(<button key={m.id} onClick={()=>setSelectedMember(m.id)} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-sm transition-all border-2 ${selectedMember===m.id?'text-white shadow-lg scale-[1.02]':'bg-white text-slate-500 border-slate-100 hover:border-slate-200'}`} style={selectedMember===m.id?{backgroundColor:m.color,borderColor:m.color,boxShadow:`0 8px 24px ${m.color}30`}:{}}><span className="text-lg">{m.emoji}</span> {m.name}</button>))}
+            </div>
+            {(()=>{
+              const md=memberData(selectedMember,today);
+              const totalH=totalSessHrs(md.sessions);
+              return(
+                <div className="space-y-4">
+                  {/* Wake */}
+                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                    <div className="flex items-center gap-3 mb-3"><div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{backgroundColor:mem.bg}}><span className="text-xl">⏰</span></div><div><h3 className="font-semibold text-slate-700">기상 시간</h3><p className="text-xs text-slate-400">{mem.name}의 기상 시각</p></div></div>
+                    <input type="time" value={md.wakeTime||''} onChange={e=>saveMember(selectedMember,today,{wakeTime:e.target.value})} className="w-full h-14 text-center text-2xl font-bold text-slate-700 rounded-xl border-2 border-slate-100 focus:outline-none focus:ring-4 transition-all" style={{'--tw-ring-color':mem.color+'30',borderColor:md.wakeTime?mem.color:'#e2e8f0'}}/>
+                    {md.wakeTime&&toMin(md.wakeTime)<=420&&(<p className="text-center text-xs font-semibold mt-2" style={{color:mem.color}}>🌅 얼리버드!</p>)}
+                  </div>
+                  {/* Routines */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className={`relative bg-white rounded-2xl border-2 shadow-sm overflow-hidden transition-all ${md.cafe?'border-amber-400':'border-slate-100'}`}>
+                      <Confetti active={confetti?.member===selectedMember&&confetti?.type==='cafe'} baseColor="#d97706"/>
+                      <div className="p-4"><div className="text-center mb-2"><span className={`text-3xl block mb-1 transition-transform ${md.cafe?'scale-110':''}`}>☕</span><p className="text-sm font-semibold text-slate-700">카페</p></div>
+                        <button onClick={()=>{const next=!md.cafe;saveMember(selectedMember,today,{cafe:next});if(next)fireConfetti(selectedMember,'cafe');}} className={`w-full py-3 rounded-xl font-bold text-sm transition-all ${md.cafe?'bg-amber-500 text-white shadow-lg shadow-amber-200 hover:bg-amber-600':'bg-amber-50 text-amber-700 border-2 border-dashed border-amber-200 hover:bg-amber-100'}`}>{md.cafe?'✓ 완료!':'체크하기'}</button></div>
+                    </div>
+                    <div className={`relative bg-white rounded-2xl border-2 shadow-sm overflow-hidden transition-all ${md.swim?'border-cyan-400':'border-slate-100'}`}>
+                      <Confetti active={confetti?.member===selectedMember&&confetti?.type==='swim'} baseColor="#0891b2"/>
+                      <div className="p-4"><div className="text-center mb-2"><span className={`text-3xl block mb-1 transition-transform ${md.swim?'scale-110':''}`}>🏊</span><p className="text-sm font-semibold text-slate-700">수영</p></div>
+                        <button onClick={()=>{const next=!md.swim;saveMember(selectedMember,today,{swim:next});if(next)fireConfetti(selectedMember,'swim');}} className={`w-full py-3 rounded-xl font-bold text-sm transition-all ${md.swim?'bg-cyan-500 text-white shadow-lg shadow-cyan-200 hover:bg-cyan-600':'bg-cyan-50 text-cyan-700 border-2 border-dashed border-cyan-200 hover:bg-cyan-100'}`}>{md.swim?'✓ 완료!':'체크하기'}</button></div>
+                    </div>
+                  </div>
+                  {/* Study Sessions */}
+                  <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+                    <div className="flex items-center justify-between mb-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{backgroundColor:mem.bg}}><span className="text-xl">📚</span></div><div><h3 className="font-semibold text-slate-700">공부 세션</h3><p className="text-xs text-slate-400">항목별 시간과 분을 기록하세요</p></div></div><span className="text-sm font-bold px-3 py-1 rounded-full" style={{color:mem.color,backgroundColor:mem.bg}}>총 {fmtHM(totalH)}</span></div>
+                    <div className="space-y-2.5 mb-3 max-h-[400px] overflow-y-auto scroll-thin">
+                      {(md.sessions||[]).map((sess,idx)=>{
+                        const updateSess=(field,val)=>{const ns=[...md.sessions];ns[idx]={...ns[idx],[field]:val};saveMember(selectedMember,today,{sessions:ns});};
+                        return(
+                          <div key={idx} className="bg-slate-50 rounded-xl p-3 anim-slide" style={{animationDelay:`${idx*50}ms`}}>
+                            <div className="flex items-center gap-2 mb-2"><span className="w-2 h-6 rounded-full shrink-0" style={{backgroundColor:mem.color}}/><input type="text" value={sess.name} placeholder="항목명 (예: 수학, LLM 연구)" onChange={e=>updateSess('name',e.target.value)} className="flex-1 min-w-0 bg-transparent text-sm font-semibold text-slate-700 outline-none placeholder:text-slate-300"/><button onClick={()=>{const ns=md.sessions.filter((_,j)=>j!==idx);saveMember(selectedMember,today,{sessions:ns});}} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-300 hover:text-red-400 hover:bg-red-50 active:scale-95 shrink-0"><XIcon size={13}/></button></div>
+                            <div className="flex items-center gap-2 ml-4">
+                              <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-1.5 py-1"><button onClick={()=>updateSess('hours',Math.max(0,(sess.hours||0)-1))} className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95"><MinusIc size={12}/></button><input type="number" min="0" max="23" value={sess.hours||''} placeholder="0" onChange={e=>updateSess('hours',Math.max(0,Math.min(23,parseInt(e.target.value)||0)))} className="w-10 h-7 text-center text-sm font-bold outline-none" style={{color:mem.color}}/><button onClick={()=>updateSess('hours',Math.min(23,(sess.hours||0)+1))} className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95"><PlusIc size={12}/></button><span className="text-xs font-semibold text-slate-400 pr-1">시간</span></div>
+                              <div className="flex items-center gap-1 bg-white rounded-lg border border-slate-200 px-1.5 py-1"><button onClick={()=>updateSess('mins',Math.max(0,(sess.mins||0)-5))} className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95"><MinusIc size={12}/></button><input type="number" min="0" max="59" value={sess.mins||''} placeholder="0" onChange={e=>updateSess('mins',Math.max(0,Math.min(59,parseInt(e.target.value)||0)))} className="w-10 h-7 text-center text-sm font-bold outline-none" style={{color:mem.color}}/><button onClick={()=>updateSess('mins',Math.min(55,(sess.mins||0)+5))} className="w-7 h-7 rounded-md flex items-center justify-center text-slate-400 hover:text-slate-600 hover:bg-slate-100 active:scale-95"><PlusIc size={12}/></button><span className="text-xs font-semibold text-slate-400 pr-1">분</span></div>
+                              <span className="text-xs font-bold ml-auto whitespace-nowrap" style={{color:mem.color}}>= {fmtHM(sessHrs(sess))}</span>
+                            </div>
+                          </div>);
+                      })}
+                      {(!md.sessions||md.sessions.length===0)&&(<p className="text-center text-sm text-slate-300 py-6">아직 세션이 없어요</p>)}
+                    </div>
+                    <button onClick={()=>saveMember(selectedMember,today,{sessions:[...(md.sessions||[]),{name:'',hours:0,mins:0}]})} className="w-full py-3 rounded-xl border-2 border-dashed font-semibold text-sm flex items-center justify-center gap-2 transition-all hover:shadow-sm active:scale-[0.99]" style={{borderColor:mem.color+'40',color:mem.color,backgroundColor:mem.bg+'80'}}><PlusIc size={16} color={mem.color}/> 공부 항목 추가</button>
+                    <div className="flex flex-wrap gap-1.5 mt-3">{['LLM 연구','전공 공부','언어 학습','독서','코딩','기타'].map(name=>(<button key={name} onClick={()=>{if(!(md.sessions||[]).some(s=>s.name===name))saveMember(selectedMember,today,{sessions:[...(md.sessions||[]),{name,hours:0,mins:0}]});}} className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 text-slate-500 hover:bg-slate-200 transition-colors">+ {name}</button>))}</div>
+                  </div>
+                </div>);
+            })()}
+          </div>
+        )}
+
+        {/* ════════ RANKING ════════ */}
+        {tab==='ranking'&&(
+          <div className="anim-slide space-y-5">
+            {weekStudy[0]?.total>0&&(<div className="relative rounded-2xl p-5 text-center overflow-hidden" style={{background:`linear-gradient(135deg, ${weekStudy[0].color}15, ${weekStudy[0].color}05)`}}><div className="relative z-10"><span className="text-4xl block mb-1 crown-glow">👑</span><span className="text-4xl block mb-2 trophy-bounce">{weekStudy[0].emoji}</span><p className="text-sm font-bold text-slate-700">이번 주 1등!</p><p className="text-2xl font-black mt-1" style={{color:weekStudy[0].color}}>{weekStudy[0].name} — {fmtHM(weekStudy[0].total)}</p><p className="text-xs text-slate-400 mt-1">🎉 축하합니다!</p></div>{Array.from({length:6},(_,i)=>(<span key={i} className="absolute sparkle-star text-lg pointer-events-none" style={{left:`${10+i*15}%`,top:`${20+Math.sin(i)*30}%`,animationDelay:`${i*0.3}s`,opacity:0.6}}>{['✨','⭐','💫','🌟','✨','⭐'][i]}</span>))}</div>)}
+            <div className="text-center"><p className="text-sm text-slate-400 font-medium">이번 주 공부 시간 랭킹</p><p className="text-xs text-slate-300 mt-0.5">{weekDates[0]} ~ {weekDates[6]}</p></div>
+            <div className="flex items-end justify-center gap-3 pt-4 pb-2">
+              {(()=>{const order=weekStudy.length>=3?[weekStudy[1],weekStudy[0],weekStudy[2]]:weekStudy;const heights=[120,160,100];const medals=['🥈','🥇','🥉'];const podiumOrder=weekStudy.length>=3?[1,0,2]:[0,1,2];return order.map((ws,vi)=>{const rank=podiumOrder[vi],isFirst=rank===0;return(<div key={ws.id} className="flex flex-col items-center anim-slide" style={{animationDelay:`${vi*100}ms`}}><span className={`text-2xl mb-1 ${isFirst?'anim-pop':''}`}>{medals[vi]||''}</span><div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl mb-2 border-3 shadow-lg ${isFirst?'ring-4 ring-yellow-200':''}`} style={{backgroundColor:ws.bg,borderColor:ws.color,boxShadow:`0 4px 16px ${ws.color}25`}}>{ws.emoji}</div><p className="text-xs font-bold text-slate-700 mb-1">{ws.name}</p><div className="rounded-t-xl flex items-end justify-center pb-2 transition-all" style={{width:80,height:heights[vi]||100,background:`linear-gradient(to top, ${ws.color}, ${ws.color}90)`}}><span className="text-white font-extrabold text-sm leading-tight text-center px-1">{fmtHM(ws.total)}</span></div></div>);});})()}
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5"><h3 className="text-sm font-bold text-slate-700 mb-4">주간 누적 공부 시간</h3><div className="space-y-4">{weekStudy.map((ws,i)=>{const pct=maxStudy>0?(ws.total/maxStudy)*100:0;return(<div key={ws.id} className="anim-slide" style={{animationDelay:`${i*80}ms`}}><div className="flex items-center justify-between mb-1.5"><div className="flex items-center gap-2"><span className="text-lg">{ws.emoji}</span><span className="text-sm font-semibold text-slate-700">{ws.name}</span>{i===0&&ws.total>0&&<span className="text-sm anim-pop">🥇</span>}</div><span className="text-sm font-extrabold" style={{color:ws.color}}>{fmtHM(ws.total)}</span></div><div className="h-8 bg-slate-100 rounded-xl overflow-hidden"><div className="h-full rounded-xl flex items-center transition-all duration-1000" style={{width:`${Math.max(pct,2)}%`,backgroundColor:ws.color}}>{pct>20&&<span className="text-white text-xs font-bold ml-3">{fmtHM(ws.total)}</span>}</div></div></div>);})}</div></div>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5"><h3 className="text-sm font-bold text-slate-700 mb-3">일별 공부 시간</h3><div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="border-b border-slate-100"><th className="py-2 text-left text-slate-400 font-medium">날짜</th>{MEMBERS.map(m=><th key={m.id} className="py-2 text-center font-semibold" style={{color:m.color}}>{m.emoji} {m.name}</th>)}</tr></thead><tbody>{weekDates.map(d=>{const isT=d===today;return(<tr key={d} className={`border-b border-slate-50 ${isT?'bg-blue-50/40':''}`}><td className={`py-2 font-medium ${isT?'text-blue-600':'text-slate-500'}`}>{DAYS[new Date(d).getDay()]} {d.slice(5)}</td>{MEMBERS.map(m=>{const hrs=totalSessHrs(allData[d]?.[m.id]?.sessions);return<td key={m.id} className="py-2 text-center font-bold" style={{color:hrs>0?m.color:'#cbd5e1'}}>{hrs>0?fmtHM(hrs):'-'}</td>;})}</tr>);})}</tbody></table></div></div>
+            <div className="grid grid-cols-3 gap-3">{MEMBERS.map(m=>{let streak=0;const d=new Date(today);while(true){const k=d.toISOString().slice(0,10);if(totalSessHrs(allData[k]?.[m.id]?.sessions)<=0)break;streak++;d.setDate(d.getDate()-1);}return(<div key={m.id} className="bg-white rounded-xl border border-slate-100 p-3 text-center"><span className="text-lg">{m.emoji}</span><p className="text-[10px] text-slate-400 mt-1">연속 공부</p><p className="text-lg font-extrabold" style={{color:m.color}}>{streak}일</p></div>);})}</div>
+          </div>
+        )}
+
+        {/* ════════ FOOD ════════ */}
+        {tab==='food'&&(
+          <div className="anim-slide space-y-5">
+            <div className="bg-gradient-to-br from-orange-500 to-amber-500 rounded-2xl p-6 text-white shadow-lg shadow-orange-200 relative overflow-hidden"><div className="absolute top-3 right-4 text-5xl opacity-20">🍽️</div><p className="text-sm font-medium text-orange-100">이번 달 공통 식비</p><p className="text-4xl font-black mt-1">{fmtWon(foodMonthTotal)}<span className="text-lg font-bold ml-1">원</span></p><p className="text-xs text-orange-200 mt-1">{foodYear}년 {foodMonth+1}월 | {foodMonthItems.length}건</p></div>
+            <div className="flex items-center justify-between">
+              <button onClick={()=>{let nm=foodMonth-1,ny=foodYear;if(nm<0){nm=11;ny--;}setFoodMonth(nm);setFoodYear(ny);}} className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 active:scale-95"><ChevL size={16} color="#475569"/></button>
+              <div className="text-center"><span className="text-sm font-bold text-slate-700">{foodYear}년 {foodMonth+1}월</span><button onClick={()=>{setFoodYear(new Date().getFullYear());setFoodMonth(new Date().getMonth())}} className="block mx-auto text-[10px] text-blue-500 hover:underline">이번 달</button></div>
+              <button onClick={()=>{let nm=foodMonth+1,ny=foodYear;if(nm>11){nm=0;ny++;}setFoodMonth(nm);setFoodYear(ny);}} className="w-9 h-9 rounded-xl bg-white border border-slate-200 flex items-center justify-center hover:bg-slate-50 active:scale-95"><ChevR size={16} color="#475569"/></button>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5"><h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><span className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-base">✏️</span>새 지출 추가</h3>
+              <div className="space-y-3">
+                <div><label className="text-[11px] font-semibold text-slate-400 block mb-1">날짜</label><input type="date" value={newFood.date} onChange={e=>setNewFood(p=>({...p,date:e.target.value}))} className="w-full h-11 px-3 text-sm font-medium text-slate-700 rounded-xl border-2 border-slate-100 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 outline-none transition-all"/></div>
+                <div><label className="text-[11px] font-semibold text-slate-400 block mb-1">품목명</label><input type="text" value={newFood.name} placeholder="예: 마트 장보기, 가족 외식" onChange={e=>setNewFood(p=>({...p,name:e.target.value}))} className="w-full h-11 px-3 text-sm font-medium text-slate-700 rounded-xl border-2 border-slate-100 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 outline-none transition-all placeholder:text-slate-300"/></div>
+                <div><label className="text-[11px] font-semibold text-slate-400 block mb-1">금액 (원)</label><div className="relative"><input type="number" value={newFood.amount} placeholder="0" onChange={e=>setNewFood(p=>({...p,amount:e.target.value}))} className="w-full h-11 px-3 pr-10 text-sm font-bold text-slate-700 rounded-xl border-2 border-slate-100 focus:border-orange-400 focus:ring-4 focus:ring-orange-100 outline-none transition-all placeholder:text-slate-300"/><span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-slate-400">원</span></div></div>
+                <div className="flex flex-wrap gap-1.5">{[5000,10000,15000,20000,30000,50000].map(amt=>(<button key={amt} onClick={()=>setNewFood(p=>({...p,amount:String(amt)}))} className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors">{fmtWon(amt)}</button>))}</div>
+                <button onClick={handleAddFood} disabled={!newFood.name||!newFood.amount} className="w-full py-3 rounded-xl font-bold text-sm transition-all bg-orange-500 text-white shadow-lg shadow-orange-200 hover:bg-orange-600 disabled:opacity-40 disabled:shadow-none active:scale-[0.99]">+ 지출 추가하기</button>
+              </div>
+            </div>
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5"><h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><span className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-base">📋</span>지출 내역<span className="text-xs font-normal text-slate-400 ml-auto">{foodMonthItems.length}건</span></h3>
+              <div className="space-y-2 max-h-[400px] overflow-y-auto scroll-thin">
+                {foodMonthItems.length===0&&(<div className="text-center py-8"><span className="text-3xl block mb-2">🧾</span><p className="text-sm text-slate-300">이번 달 지출 내역이 없어요</p></div>)}
+                {(()=>{let lastDate='';return foodMonthItems.map(f=>{const showDate=f.date!==lastDate;lastDate=f.date;const dow=DAYS[new Date(f.date).getDay()];return(<div key={f.id}>{showDate&&(<p className="text-[11px] font-semibold text-slate-400 mt-3 mb-1 flex items-center gap-1">📅 {f.date.slice(5)} ({dow})</p>)}<div className="flex items-center gap-3 bg-slate-50 rounded-xl px-4 py-3 group anim-slide"><div className="flex-1 min-w-0"><p className="text-sm font-medium text-slate-700 truncate">{f.name}</p></div><span className="text-sm font-extrabold text-orange-600 whitespace-nowrap">{fmtWon(f.amount)}원</span><button onClick={()=>deleteFood(f.id)} className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-200 hover:text-red-400 hover:bg-red-50 active:scale-95 opacity-0 group-hover:opacity-100 transition-all shrink-0"><XIcon size={13}/></button></div></div>);});})()}
+              </div>
+              {foodMonthItems.length>0&&(<div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between"><span className="text-xs font-semibold text-slate-400">이번 달 합계</span><span className="text-lg font-black text-orange-600">{fmtWon(foodMonthTotal)}원</span></div>)}
+            </div>
+            {foodMonthItems.length>0&&(()=>{const cats={};foodMonthItems.forEach(f=>{cats[f.name]=(cats[f.name]||0)+f.amount;});const sorted=Object.entries(cats).sort((a,b)=>b[1]-a[1]);const topAmt=sorted[0]?.[1]||1;return(<div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5"><h3 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2"><span className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center text-base">📊</span>품목별 요약</h3><div className="space-y-3">{sorted.map(([name,amt],i)=>{const pct=(amt/topAmt)*100;return(<div key={name}><div className="flex items-center justify-between mb-1"><span className="text-xs font-medium text-slate-600">{name}</span><span className="text-xs font-bold text-orange-600">{fmtWon(amt)}원</span></div><div className="h-2.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full rounded-full transition-all duration-700" style={{width:`${pct}%`,backgroundColor:['#f97316','#fb923c','#fdba74','#fed7aa','#ffedd5'][i%5]}}/></div></div>);})}</div></div>);})()}
+          </div>
+        )}
+      </main>
+
+      <footer className="text-center py-6 text-[10px] text-slate-300">Family Study Tracker {isConfigured&&'| Powered by Supabase Realtime'}</footer>
+
+      <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-md border-t border-slate-200 sm:hidden z-40">
+        <div className="flex">
+          {[['calendar','📅','달력'],['input','✏️','입력'],['ranking','🏆','랭킹'],['food','🍽️','식비']].map(([k,icon,label])=>(
+            <button key={k} onClick={()=>setTab(k)} className={`flex-1 py-2.5 flex flex-col items-center gap-0.5 text-[10px] font-semibold transition-colors ${tab===k?'text-slate-800':'text-slate-400'}`}><span className="text-lg">{icon}</span>{label}</button>
+          ))}
+        </div>
+      </div>
+      <div className="h-16 sm:hidden"/>
+
+      <DayModal dateStr={selectedDate} allData={allData} onClose={()=>setSelectedDate(null)}/>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App));
+</script>
+</body>
+</html>
